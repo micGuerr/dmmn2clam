@@ -8,8 +8,16 @@ import extract_tissue
 import shutil
 import math
 import glob
+import argparse
+
+parser = argparse.ArgumentParser(description="Params")
+parser.add_argument( "--source", nargs="?", type=str, help='path to folder containing raw wsi image files')
+parser.add_argument( "--out_path", nargs="?", type=str, default='test_coords.csv', help='a file listing all patch coordinates')
+parser.add_argument( "--otsu", nargs="?", type=bool, default=False)
 
 if __name__ == '__main__':
+
+    args = parser.parse_args()
     
     slides_to_read = ["testing_images/1.svs","testing_images/2.svs","testing_images/3.svs"] # list of testing whole slide images
     coord_file = open('test_coords.csv', 'w') # a file listing all patch coordinates
