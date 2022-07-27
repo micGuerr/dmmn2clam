@@ -25,7 +25,7 @@ if __name__ == '__main__':
     #slides_to_read = ["testing_images/1.svs","testing_images/2.svs","testing_images/3.svs"] # list of testing whole slide images
 
     coord_file_path = args.out_path
-    coord_file = open(coord_file_path, 'w') # a file listing all patch coordinates
+    coord_file = open(coord_file_path, 'w')  # a file listing all patch coordinates
 
     do_otsu = args.otsu
 
