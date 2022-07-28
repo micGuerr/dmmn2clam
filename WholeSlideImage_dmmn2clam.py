@@ -16,6 +16,7 @@ from wsi_core.wsi_utils import savePatchIter_bag_hdf5, initialize_hdf5_bag, coor
 import itertools
 from wsi_core.util_classes import isInContourV1, isInContourV2, isInContourV3_Easy, isInContourV3_Hard, Contour_Checking_fn
 from utils.file_utils import load_pkl, save_pkl
+from scipy.io import loadmat
 
 Image.MAX_IMAGE_PIXELS = 933120000
 
@@ -88,7 +89,7 @@ class WholeSlideImage(object):
         asset_dict = {'holes': self.holes_tissue, 'tissue': self.contours_tissue}
         save_pkl(mask_file, asset_dict)
 
-    def segmentTissue(self, seg_level=0, sthresh=20, sthresh_up = 255, mthresh=7, close = 0, use_otsu=False, 
+    def segmentTissue(self, dmmn_seg, seg_level=0, sthresh=20, sthresh_up = 255, mthresh=7, close = 0, use_otsu=False,
                             filter_params={'a_t':100}, ref_patch_size=512, exclude_ids=[], keep_ids=[]):
         """
             Segment the tissue via HSV -> Median thresholding -> Binary threshold
@@ -148,10 +149,23 @@ class WholeSlideImage(object):
         
        
         # Thresholding
-        if use_otsu:
-            _, img_otsu = cv2.threshold(img_med, 0, sthresh_up, cv2.THRESH_OTSU+cv2.THRESH_BINARY)
-        else:
-            _, img_otsu = cv2.threshold(img_med, sthresh, sthresh_up, cv2.THRESH_BINARY)
+        # if use_otsu:
+        #     _, img_otsu = cv2.threshold(img_med, 0, sthresh_up, cv2.THRESH_OTSU+cv2.THRESH_BINARY)
+        # else:
+        #     _, img_otsu = cv2.threshold(img_med, sthresh, sthresh_up, cv2.THRESH_BINARY)
+
+        # curremtly hard coded. needs to be changed
+        data = loadmat(dmmn_seg)
+        img_otsu = data['seg']
+        #img_otsu = data['seg_ds']  # temporary
+
+        plt.figure("DMMN seg")
+        plt.imshow(img_otsu)
+        plt.savefig( os.path.splitext(dmmn_seg)[0] + '.png')
+
+        plt.figure("Origianl data")
+        plt.imshow(img)
+        plt.savefig(os.path.splitext(dmmn_seg)[0] + '_orig.png')
 
         # Morphological closing
         if close > 0:

@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 import pdb
 	
 '''
@@ -14,15 +15,22 @@ args:
 	patch_params (dict): patching paramters
 	use_heatmap_args (bool): whether to include heatmap arguments such as ROI coordinates
 '''
-def initialize_df(slides, seg_params, filter_params, vis_params, patch_params, 
+def initialize_df(slides, slide_segs, seg_params, filter_params, vis_params, patch_params,
 	use_heatmap_args=False, save_patches=False):
 
 	total = len(slides)
 	if isinstance(slides, pd.DataFrame):
 		slide_ids = slides.slide_id.values
+		slide_seg_ids = slides.slide_seg_id.values
 	else:
 		slide_ids = slides
-	default_df_dict = {'slide_id': slide_ids, 'process': np.full((total), 1, dtype=np.uint8)}
+		slide_seg_ids = slide_segs
+
+	# for x, y in zip(slide_ids, slide_seg_ids):
+	# 	if os.path.splitext(x)[0] != os.path.splitext(y)[0]:
+	# 		raise ValueError(x + ' and ' + y + ' values should be the same.')
+
+	default_df_dict = {'slide_id': slide_ids, 'slide_seg_ids': slide_seg_ids, 'process': np.full((total), 1, dtype=np.uint8)}
 
 	# initiate empty labels in case not provided
 	if use_heatmap_args:

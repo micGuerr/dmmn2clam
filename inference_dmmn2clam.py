@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 import matplotlib as mpl
-
+#mpl.use('TkAgg')
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -87,23 +87,24 @@ def test():
             inputs = torch.flip(inputs.permute(0, 1, 3, 2), [1])
 
             if tilecnt >= len(test_file_patches):
-                outfile = color_change(outfile)
-                image_size = slide.dimensions
-                bmp.writebmp(filename, outfile, int(image_size[0]), int(image_size[1]), palette='standard')
+                saveSeg(outfile, slide, filename, filename_img)
                 break
 
-            filename = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + ".mat")
+            filename = os.path.join(os.path.abspath(args.out_path), str(slide_id) + ".mat")
+            filename_img = os.path.join(os.path.abspath(args.out_path), str(slide_id) + ".png")
             if slide_id != pslide_id:
-                pfilename = os.path.join(
-                    os.path.abspath(args.out_path) + "/" + str(pslide_id) + ".svs_data/predictions.bmp")
-                outfile = color_change(outfile)
-                image_size = slide.dimensions
-                bmp.writebmp(pfilename, outfile, int(image_size[0]), int(image_size[1]), palette='standard')
-                slide = openslide.OpenSlide(data_path + str(slide_id) + ".svs")
-            if not os.path.isdir(os.path.dirname(filename)):
+                pfilename = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + ".mat")
+                pfilename_img = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + ".png")
+
+                saveSeg(outfile, slide, pfilename, pfilename_img)
+
+                slide = openslide.OpenSlide( os.path.join(data_path, str(pslide_id) + ".ndpi"))
+
+            if not os.path.isfile(filename):
                 os.makedirs(os.path.dirname(filename), exist_ok=True)
                 image_size = slide.dimensions
                 outfile = bmp.makeempty(int(image_size[0]), int(image_size[1]))
+                saveSeg(outfile, slide, filename, filename_img)
 
             xmin = int(test_file_patches_split[1])
             ymin = int(test_file_patches_split[2])
@@ -253,6 +254,11 @@ def test():
                     outfile[t2:t2 + 256, t1:t1 + 128] = t_mask_shrink
             pslide_id = slide_id
             tilecnt += 1
+#bmp.writebmp(filename, outfile, int(image_size[0]), int(image_size[1]), palette='standard')
+
+
+def saveSeg(outfile, slide, filename, filename_img, ds_factor=64):
+
     outfile = color_change(outfile)
     image_size = slide.dimensions
 
@@ -263,8 +269,7 @@ def test():
 
     # Get the best level of the WSI for a down sampling of ds_factor.
     # Note that the ds_factor=64 value is based on CLAM's implementation
-    ds_factor = 64
-    if len(slide.level_dim) == 1:
+    if slide.level_count == 1:
         seg_level = 0
     else:
         best_level = slide.get_best_level_for_downsample(ds_factor)
@@ -279,11 +284,13 @@ def test():
     savemat(filename, out_dic)
 
     # create a figure of both the down sampled image and mask for comparison
+    fig_seg = plt.figure()
+    plt.imshow(outfile_bin)
+    fig_seg.savefig(filename_img)
 
-
-
-    #bmp.writebmp(filename, outfile, int(image_size[0]), int(image_size[1]), palette='standard')
-
+    # fig_orig = plt.figure()
+    # plt.imshow(outfile_bin)
+    # fig_orig.savefig(filename_img)
 
 def color_change(t_mask):
     t_mask[t_mask == 0] = 4 * 17  # label excluded regions by Otsu algorithm as background (class 4)

@@ -1,7 +1,7 @@
 # internal imports
-from wsi_core.WholeSlideImage import WholeSlideImage
+from wsi_core.WholeSlideImage_dmmn2clam import WholeSlideImage
 from wsi_core.wsi_utils import StitchCoords
-from wsi_core.batch_process_utils import initialize_df
+from wsi_core.batch_process_utils_dmmn2clam import initialize_df
 # other imports
 import os
 import numpy as np
@@ -17,12 +17,12 @@ def stitching(file_path, wsi_object, downscale = 64):
 	
 	return heatmap, total_time
 
-def segment(WSI_object, seg_params, filter_params):
+def segment(WSI_object, dmmn_seg, seg_params, filter_params):
 	### Start Seg Timer
 	start_time = time.time()
 
 	# Segment
-	WSI_object.segmentTissue(**seg_params, filter_params=filter_params)
+	WSI_object.segmentTissue(dmmn_seg, **seg_params, filter_params=filter_params)
 
 	### Stop Seg Timers
 	seg_time_elapsed = time.time() - start_time   
@@ -41,7 +41,7 @@ def patching(WSI_object, **kwargs):
 	return file_path, patch_time_elapsed
 
 
-def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, 
+def seg_and_patch(source, dmmn_seg, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir,
 				  patch_size = 256, step_size = 256, 
 				  seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': False,
 				  'keep_ids': 'none', 'exclude_ids': 'none'},
@@ -58,12 +58,18 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
 	slides = sorted(os.listdir(source))
 	slides = [slide for slide in slides if os.path.isfile(os.path.join(source, slide))]
+
+	# store the DMMN segmentations
+	slide_segs = sorted(os.listdir(dmmn_seg))
+	slide_segs = [slide_seg for slide_seg in slide_segs if (os.path.splitext(slide_seg)[1] != '.png')]
+
 	if process_list is None:
-		df = initialize_df(slides, seg_params, filter_params, vis_params, patch_params)
+		df = initialize_df(slides, slide_segs, seg_params, filter_params, vis_params, patch_params)
 	
 	else:
 		df = pd.read_csv(process_list)
 		df = initialize_df(df, seg_params, filter_params, vis_params, patch_params)
+
 
 	mask = df['process'] == 1
 	process_stack = df[mask]
@@ -87,6 +93,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		df.to_csv(os.path.join(save_dir, 'process_list_autogen.csv'), index=False)
 		idx = process_stack.index[i]
 		slide = process_stack.loc[idx, 'slide_id']
+		slide_seg = process_stack.loc[idx, 'slide_seg_ids']
 		print("\n\nprogress: {:.2f}, {}/{}".format(i/total, i, total))
 		print('processing {}'.format(slide))
 		
@@ -101,6 +108,9 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		# Inialize WSI
 		full_path = os.path.join(source, slide)
 		WSI_object = WholeSlideImage(full_path)
+
+		# define the path to the relevant segmentation
+		full_path_seg = os.path.join(dmmn_seg, slide_seg)
 
 		if use_default_params:
 			current_vis_params = vis_params.copy()
@@ -182,7 +192,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
 		seg_time_elapsed = -1
 		if seg:
-			WSI_object, seg_time_elapsed = segment(WSI_object, current_seg_params, current_filter_params) 
+			WSI_object, seg_time_elapsed = segment(WSI_object, full_path_seg, current_seg_params, current_filter_params)
 
 		if save_mask:
 			mask = WSI_object.visWSI(**current_vis_params)
@@ -226,6 +236,8 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 parser = argparse.ArgumentParser(description='seg and patch')
 parser.add_argument('--source', type = str,
 					help='path to folder containing raw wsi image files')
+parser.add_argument('--dmmn_seg', type = str,
+					help='path to folder containing dmmn output segmentations in .mat file format')
 parser.add_argument('--step_size', type = int, default=256,
 					help='step_size')
 parser.add_argument('--patch_size', type = int, default=256,
@@ -257,11 +269,13 @@ if __name__ == '__main__':
 		process_list = None
 
 	print('source: ', args.source)
+	print('dmmn_seg: ', args.dmmn_seg)
 	print('patch_save_dir: ', patch_save_dir)
 	print('mask_save_dir: ', mask_save_dir)
 	print('stitch_save_dir: ', stitch_save_dir)
 	
-	directories = {'source': args.source, 
+	directories = {'source': args.source,
+				   'dmmn_seg': args.dmmn_seg,
 				   'save_dir': args.save_dir,
 				   'patch_save_dir': patch_save_dir, 
 				   'mask_save_dir' : mask_save_dir, 
