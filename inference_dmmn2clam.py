@@ -33,6 +33,7 @@ parser.add_argument("--coord_path", nargs="?", type=str, help="Path to the coord
 parser.add_argument("--source", nargs="?", type=str, help='path to folder containing raw wsi image files')
 parser.add_argument("--model_path", nargs="?", type=str, default="models/DMMN-ovary.pkl")
 parser.add_argument("--out_path", nargs="?", type=str, default="imgs/DMMN-ovary", help="Path of the output segmap")
+parser.add_argument( "--zoom", nargs="?", type=int, default=20, help="Magnification factor at which the slide should be processed")
 
 
 ### Ovarian cancer pretrained model segmentation classes ###
@@ -41,73 +42,130 @@ parser.add_argument("--out_path", nargs="?", type=str, default="imgs/DMMN-ovary"
 
 def test():
 
-    bmp = bmpw()
-    model_file_name = os.path.split(args.model_path)[1]
+    bmp = bmpw()  # related to get a bitmap output. create object
+    model_file_name = os.path.split(args.model_path)[1]  # get model name
+
+    # create dictionary in which to store some model name info
     model_name = {}
     model_name['arch'] = "DMMN"
+
+    # check availability of CUDA
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     n_classes = 7  # the number of tissue subtype classes + 1
     test_file = args.coord_path  # the list of patch coordinates
+
+    # ope the coord file, get the content
     with open(test_file) as f1:
         test_file_patches = [line.rstrip('\n') for line in f1]
+
     data_path = args.source  # the path where testing whole slide images are located
-    tile_size = 1024
+    tile_size = 1024  # the tile size
+    zoom = args.zoom  # what is the magnification factor at which we want to work?
+
+    # Following variables seem to be not used
     problem_type = 'tissue'
-    batch_size = 1
+    batch_size = 1  # What this refer to??
+
+    # This look completely random
     with open(test_file) as f:
         file_names = [line.rstrip('\n') for line in f]
 
+    # Get the model
     model = get_model(model_name, n_classes)
     state = convert_state_dict(torch.load(args.model_path)["model_state"])
     model.load_state_dict(state)
     model.eval()
     model.cuda()
 
+    # create output directory if not exist
     if not os.path.exists(str(args.out_path)):
         os.makedirs(str(args.out_path))
 
+    # get the first slide file in the coord file
     test_file_patches_split = test_file_patches[0].split(",")
     pslide_id = test_file_patches_split[0]
-    filename = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + ".mat")
-    filename_img = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + ".png")
-    slide = openslide.OpenSlide( os.path.join(data_path, str(pslide_id) + ".ndpi"))
-    tilecnt = 0
 
+    # define input and output names for first input
+    slide = openslide.OpenSlide(os.path.join(data_path, str(pslide_id) + ".ndpi"))
+    filename = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + ".mat")
+    filename_img = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + '_mask' + ".png")
+    filenameII_img = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + ".png")
+
+    # start counting of tiles
+    tilecnt = 0
+    # flag to check if it is first loop for current slide
+    is1stLoop = 1
+
+    # loop over all the lines of the coordinates file
     with torch.no_grad():
         for ii in tqdm(range(0, len(test_file_patches))):
+
+            # take current line slide ID, X and Y coord
             test_file_patches_split = test_file_patches[ii].split(",")
             slide_id = test_file_patches_split[0]
             xmin = int(test_file_patches_split[1])
             ymin = int(test_file_patches_split[2])
-            inputs_slide = slide.read_region((xmin, ymin), 0, (tile_size, tile_size)).convert('RGB')
+
+            # What down-sampling facto should be used based on the desired magnification
+            slide_zoom = int(slide.properties[openslide.PROPERTY_NAME_OBJECTIVE_POWER])
+            ds_factor = slide_zoom / zoom
+            best_ds_level = slide.get_best_level_for_downsample(ds_factor)
+
+            # Open the tile at the right level from the relevant slide.
+            inputs_slide = slide.read_region((xmin, ymin), best_ds_level, (tile_size, tile_size)).convert('RGB')
+            # Convert it into np array and normalize, then make it a torch array
             inputs_slide = np.array(inputs_slide) / 255.0
             inputs_slide = np.expand_dims(np.transpose(inputs_slide, (2, 1, 0)), axis=0)
             inputs = torch.from_numpy(inputs_slide).float().to(device)
             inputs = torch.flip(inputs.permute(0, 1, 3, 2), [1])
 
+            # This should never happen...based on the for loop...
             if tilecnt >= len(test_file_patches):
-                saveSeg(outfile, slide, filename, filename_img)
+                saveSeg(outfile, slide, filename, filename_img, filenameII_img, best_ds_level)
                 break
 
+            # Update the file input and output names
             filename = os.path.join(os.path.abspath(args.out_path), str(slide_id) + ".mat")
-            filename_img = os.path.join(os.path.abspath(args.out_path), str(slide_id) + ".png")
-            if slide_id != pslide_id:
+            filename_img = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + '_mask' + ".png")
+            filenameII_img = os.path.join(os.path.abspath(args.out_path), str(slide_id) + ".png")
+
+            # Check if the input slide changed
+            if slide_id != pslide_id:  # if it is changed
+
+                # Define output and input names using old ID
                 pfilename = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + ".mat")
-                pfilename_img = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + ".png")
+                pfilename_img = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + '_mask' + ".png")
+                pfilenameII_img = os.path.join(os.path.abspath(args.out_path), str(pslide_id) + ".png")
 
-                saveSeg(outfile, slide, pfilename, pfilename_img)
+                # Save the output for this slide
+                saveSeg(outfile, slide, pfilename, pfilename_img, pfilenameII_img, best_ds_level)
 
-                slide = openslide.OpenSlide( os.path.join(data_path, str(pslide_id) + ".ndpi"))
+                # Open the next slide (shouldn't it be SLIDE_ID  ?!?)
+                slide = openslide.OpenSlide( os.path.join(data_path, str(slide_id) + ".ndpi"))  # slide_id !!!!!
+                # set the flag to 1
+                is1stLoop = 1
 
-            if not os.path.isfile(filename):
-                os.makedirs(os.path.dirname(filename), exist_ok=True)
-                image_size = slide.dimensions
-                outfile = bmp.makeempty(int(image_size[0]), int(image_size[1]))
-                saveSeg(outfile, slide, filename, filename_img)
+            # Check if it is 1st loop for current slide
+            if is1stLoop:
 
+                # create the output folder if needed
+                if not os.path.exists(os.path.dirname(filename)):
+                    os.makedirs(os.path.dirname(filename), exist_ok=True)
+                # define the output object
+                image_size = slide.level_dimensions[best_ds_level]  # get the image size
+                outfile = bmp.makeempty(int(image_size[0]), int(image_size[1]))  # define the output
+
+                # set the flag to 0
+                is1stLoop = 0
+                #saveSeg(outfile, slide, filename, filename_img, filenameII_img)  # save the image
+
+            # Get the X and Y coordinates
             xmin = int(test_file_patches_split[1])
             ymin = int(test_file_patches_split[2])
+
+            ####################################################################################
+            ################ CHECK DIFFERENT TYPE OF COMBINATIONS ##############################
             if xmin == 0 and ymin == 0:
                 # tile at outfile[0:128,0:128]
                 ref_pad = nn.ReflectionPad2d(512)
@@ -229,18 +287,27 @@ def test():
                     else:
                         outfile[128:384, t1:t1 + 128] = t_mask_shrink
 
+            # Evaluate the segmentation in a general voxel
+            ##############################################
+
+            # get the coordinates (in the 0 slide level)
             xmin = int(test_file_patches_split[1])
             ymin = int(test_file_patches_split[2])
+
+            # assess the estimation
             outputs = model(inputs[:, :, 384:640, 384:640], inputs[:, :, ::2, ::2][:, :, 128:384, 128:384],
                             inputs[:, :, ::4, ::4])
+            # make the output as np array
             t_masks = torch.argmax(outputs, dim=1).cpu().numpy().astype(np.uint8)
+            # we take only the first dimension (why??)
             t_mask = t_masks[0, :, :]
+            # The segmentation values refers to the central voxel which is in the range [3*tail/8 , 5*tail/8]
             xmin += 384
             ymin += 384
             t_mask_shrink = mask_shrink(t_mask)
-            t1 = bmp.getrowsize(int(xmin))
-            t2 = int(ymin)
-            image_size = slide.dimensions
+            t1 = bmp.getrowsize(int(xmin/ds_factor))
+            t2 = int(ymin/ds_factor)
+            image_size = slide.level_dimensions[best_ds_level]
             wh1 = bmp.getrowsize(int(image_size[0]))
             wh2 = int(image_size[1])
             if t1 < wh1 and t2 < wh2:
@@ -252,20 +319,28 @@ def test():
                     outfile[t2:t2 + 256, t1:] = t_mask_shrink[:, 0:wh1 - t1]
                 else:
                     outfile[t2:t2 + 256, t1:t1 + 128] = t_mask_shrink
+
+            ############################################################################################################
+            ############################################################################################################
+
+            # update slide ID and tile count
             pslide_id = slide_id
             tilecnt += 1
+
+        # save output
+        saveSeg(outfile, slide, filename, filename_img, filenameII_img, best_ds_level)
 #bmp.writebmp(filename, outfile, int(image_size[0]), int(image_size[1]), palette='standard')
 
 
-def saveSeg(outfile, slide, filename, filename_img, ds_factor=64):
+def saveSeg(outfile, slide, filename, filename_img, filename_orig, slide_level=0 , ds_factor=64, imshow_level=4):
 
     outfile = color_change(outfile)
-    image_size = slide.dimensions
 
     # Convert result in a binary map of 1s and 0s
     outfile_bin = outfile
-    outfile_bin[outfile_bin == 17] = 1
-    outfile_bin[outfile_bin == 68] = 0
+    #outfile_bin[outfile_bin == 17] = 1
+    #outfile_bin[outfile_bin == 68] = 0
+    outfile_bin[outfile_bin == 4] = 0
 
     # Get the best level of the WSI for a down sampling of ds_factor.
     # Note that the ds_factor=64 value is based on CLAM's implementation
@@ -284,27 +359,45 @@ def saveSeg(outfile, slide, filename, filename_img, ds_factor=64):
     savemat(filename, out_dic)
 
     # create a figure of both the down sampled image and mask for comparison
-    fig_seg = plt.figure()
-    plt.imshow(outfile_bin)
-    fig_seg.savefig(filename_img)
+    # NOTE: uncomment following command in case visualization is needed
+    #mpl.use('TkAgg')
 
-    # fig_orig = plt.figure()
-    # plt.imshow(outfile_bin)
-    # fig_orig.savefig(filename_img)
+    # 1 save the segmentation
+    # use a lower downsampling for the figure
+    outfile_bin_ds = cv2.resize(outfile_bin, slide.level_dimensions[imshow_level] , interpolation=cv2.INTER_NEAREST)
+    fig_seg = plt.figure()
+    im = plt.imshow(outfile_bin_ds, cmap='Dark2')
+    plt.colorbar(im)
+    plt.xticks([])
+    plt.yticks([])
+    # plt.show()
+    fig_seg.savefig(filename_img, dpi=800)
+
+    # 2 save the slide
+    fig_slide = slide.read_region((0, 0), imshow_level, slide.level_dimensions[imshow_level]).convert('RGB')
+    fig_slide.save(filename_orig)
+
 
 def color_change(t_mask):
-    t_mask[t_mask == 0] = 4 * 17  # label excluded regions by Otsu algorithm as background (class 4)
+    t_mask[t_mask == 0] = 4
+    #t_mask[t_mask == 0] = 4 * 17  # label excluded regions by Otsu algorithm as background (class 4)
     return t_mask
 
 
 def mask_shrink(t_mask):
     # class rearrangement
-    t_mask[t_mask == 1] = 4
-    t_mask[t_mask == 2] = 4
-    t_mask[t_mask == 5] = 4
-    t_mask[t_mask == 6] = 4
-    t_mask[t_mask == 3] = 1
-    t_mask_shrink = t_mask[:, ::2] * 17
+    #t_mask[t_mask == 1] = 4
+    #t_mask[t_mask == 2] = 4
+    #t_mask[t_mask == 5] = 4
+    #t_mask[t_mask == 6] = 4
+    #t_mask[t_mask == 3] = 1
+    t_mask[t_mask == 1] = 1
+    t_mask[t_mask == 2] = 2
+    t_mask[t_mask == 5] = 5
+    t_mask[t_mask == 6] = 6
+    t_mask[t_mask == 3] = 3
+    #t_mask_shrink = t_mask[:, ::2] * 17
+    t_mask_shrink = t_mask[:, ::2]
     return t_mask_shrink
 
 
