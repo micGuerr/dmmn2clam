@@ -41,13 +41,18 @@ ln -s <fullPath_to_dmmn2clam_repo>m/slidereader_coords_dmmn2clam.py <fullPath_to
 ln -s <fullPath_to_dmmn2clam_repo>/inference_dmmn2clam.py <fullPath_to_DMMN-ovary_repo>/inference_dmmn2clam.py
 ```
 
+Note that in Windows the link can be constructed as:
+```
+
+```
+
 ## Usage
 
 Below an example of the commands needed to integrate the DMMN-ovary segmentation into CLAM (here I assume that there are two conda environments configured for either DMMN-ovary or CLAM):
 ```
 cd <fullPath_to_DMMN-ovary_repo>
 conda activate <clam_conda_env_name>
-python slidereader_coords_dmmn2clam.py --source <source_data> --out_path <coord_file_name>.csv
+python slidereader_coords_dmmn2clam.py --source <path_to_slideList>.txt --out_path <coord_file_name>.csv
 python inference_dmmn2clam.py --coord_path <coord_file_name>.csv --source <source_data> --out_path <seg_folder_name>
 conda deactivate
 ```
