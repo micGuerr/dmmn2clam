@@ -27,6 +27,15 @@ Let's assume CLAM's repo is downloaded in `<fullPath_to_CLAM_repo>`, DMMN-Ovary 
 1. Configure both CLAM and DMMN-Ovary GitHub repositories in such a way they can be used in their standard configuration.
 
 2. Run the following commands from command line:
+
+Link the DMMN-ovary files into the DMMN-ovary directory:
+```
+ln -s <fullPath_to_dmmn2clam_repo>m/slidereader_coords_dmmn2clam.py <fullPath_to_DMMN-ovary_repo>/slidereader_coords_dmmn2clam.py
+
+ln -s <fullPath_to_dmmn2clam_repo>/inference_dmmn2clam.py <fullPath_to_DMMN-ovary_repo>/inference_dmmn2clam.py
+```
+
+Link CLAM's files into CLAM directory:
 ```
 ln -s <fullPath_to_dmmn2clam_repo>/create_patches_fp_dmmn2clam.py <fullPath_to_CLAM_repo>/create_patches_fp_dmmn2clam.py
 
@@ -35,15 +44,9 @@ ln -s <fullPath_to_dmmn2clam_repo>/WholeSlideImage_dmmn2clam.py <fullPath_to_CLA
 ln -s <fullPath_to_dmmn2clam_repo>/batch_process_utils_dmmn2clam.py <fullPath_to_CLAM_repo>/wsi_core/batch_process_utils_dmmn2clam.py
 ```
 
+Note that in Windows the link can be constructed from prompt window, opened as admin, with `mklink` command, e.g.:
 ```
-ln -s <fullPath_to_dmmn2clam_repo>m/slidereader_coords_dmmn2clam.py <fullPath_to_DMMN-ovary_repo>/slidereader_coords_dmmn2clam.py
-
-ln -s <fullPath_to_dmmn2clam_repo>/inference_dmmn2clam.py <fullPath_to_DMMN-ovary_repo>/inference_dmmn2clam.py
-```
-
-Note that in Windows the link can be constructed as:
-```
-
+mklink<fullPath_to_DMMN-ovary_repo>/inference_dmmn2clam.py <fullPath_to_dmmn2clam_repo>/inference_dmmn2clam.py
 ```
 
 ## Usage
