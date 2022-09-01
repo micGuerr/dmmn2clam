@@ -33,6 +33,8 @@ Link the DMMN-ovary files into the DMMN-ovary directory:
 ln -s <fullPath_to_dmmn2clam_repo>m/slidereader_coords_dmmn2clam.py <fullPath_to_DMMN-ovary_repo>/slidereader_coords_dmmn2clam.py
 
 ln -s <fullPath_to_dmmn2clam_repo>/inference_dmmn2clam.py <fullPath_to_DMMN-ovary_repo>/inference_dmmn2clam.py
+
+ln -s <fullPath_to_dmmn2clam_repo>/extract_tissue_dmmn2clam.py <fullPath_to_DMMN-ovary_repo>/extract_tissue_dmmn2clam.py
 ```
 
 Link CLAM's files into CLAM directory:
