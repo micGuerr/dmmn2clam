@@ -4,7 +4,7 @@ from pdb import set_trace
 import os
 import numpy as np
 import openslide
-import extract_tissue
+import extract_tissue_dmmn2clam as extract_tissue
 import shutil
 import math
 import glob
