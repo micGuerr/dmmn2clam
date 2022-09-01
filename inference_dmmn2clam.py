@@ -99,7 +99,7 @@ def test():
 
     # loop over all the lines of the coordinates file
     with torch.no_grad():
-        for ii in tqdm(range(0, len(test_file_patches))):
+        for ii in  tqdm(range(0, len(test_file_patches))):
 
             # take current line slide ID, X and Y coord
             test_file_patches_split = test_file_patches[ii].split(",")
@@ -111,6 +111,9 @@ def test():
             slide_zoom = int(slide.properties[openslide.PROPERTY_NAME_OBJECTIVE_POWER])
             ds_factor = slide_zoom / zoom
             best_ds_level = slide.get_best_level_for_downsample(ds_factor)
+
+            # The step I need to do to get to the patch centre is
+            step2center = tile_size*3/8*ds_factor
 
             # Open the tile at the right level from the relevant slide.
             inputs_slide = slide.read_region((xmin, ymin), best_ds_level, (tile_size, tile_size)).convert('RGB')
@@ -214,7 +217,7 @@ def test():
             xmin = int(test_file_patches_split[1])
             ymin = int(test_file_patches_split[2])
             if xmin == 0:
-                ymin += 384
+                ymin += step2center
                 # tile at outfile[0:128,ymin:ymin+256]
                 ref_pad = nn.ReflectionPad2d((512, 512, 0, 0))
                 inputs_new = torch.zeros([1, 3, 1024, 1024]).cuda()
@@ -224,7 +227,8 @@ def test():
                 t_masks = torch.argmax(outputs, dim=1).cpu().numpy().astype(np.uint8)
                 t_mask = t_masks[0, :, :]
                 t_mask_shrink = mask_shrink(t_mask)
-                t2 = int(ymin)
+                t2 = int(ymin/ds_factor)
+                image_size = slide.level_dimensions[best_ds_level]
                 wh2 = int(image_size[1])
                 if t2 < wh2:
                     if t2 + 256 > wh2:
@@ -241,7 +245,8 @@ def test():
                 t_masks = torch.argmax(outputs, dim=1).cpu().numpy().astype(np.uint8)
                 t_mask = t_masks[0, :, :]
                 t_mask_shrink = mask_shrink(t_mask)
-                t2 = int(ymin)
+                t2 = int(ymin/ds_factor)
+                image_size = slide.level_dimensions[best_ds_level]
                 wh2 = int(image_size[1])
                 if t2 < wh2:
                     if t2 + 256 > wh2:
@@ -252,7 +257,7 @@ def test():
             xmin = int(test_file_patches_split[1])
             ymin = int(test_file_patches_split[2])
             if ymin == 0:
-                xmin += 384
+                xmin += step2center
                 # tile at outfile[xmin:xmin+256,0:128]
                 ref_pad = nn.ReflectionPad2d((0, 0, 512, 512))
                 inputs_new = torch.zeros([1, 3, 1024, 1024]).cuda()
@@ -262,7 +267,8 @@ def test():
                 t_masks = torch.argmax(outputs, dim=1).cpu().numpy().astype(np.uint8)
                 t_mask = t_masks[0, :, :]
                 t_mask_shrink = mask_shrink(t_mask)
-                t1 = bmp.getrowsize(int(xmin))
+                image_size = slide.level_dimensions[best_ds_level]
+                t1 = bmp.getrowsize(int(xmin/ds_factor))
                 wh1 = bmp.getrowsize(int(image_size[0]))
                 if t1 < wh1:
                     if t1 + 128 > wh1:
@@ -279,7 +285,8 @@ def test():
                 t_masks = torch.argmax(outputs, dim=1).cpu().numpy().astype(np.uint8)
                 t_mask = t_masks[0, :, :]
                 t_mask_shrink = mask_shrink(t_mask)
-                t1 = bmp.getrowsize(int(xmin))
+                t1 = bmp.getrowsize(int(xmin/ds_factor))
+                image_size = slide.level_dimensions[best_ds_level]
                 wh1 = bmp.getrowsize(int(image_size[0]))
                 if t1 < wh1:
                     if t1 + 128 > wh1:
@@ -302,10 +309,10 @@ def test():
             # we take only the first dimension (why??)
             t_mask = t_masks[0, :, :]
             # The segmentation values refers to the central voxel which is in the range [3*tail/8 , 5*tail/8]
-            xmin += 384
-            ymin += 384
+            xmin += step2center
+            ymin += step2center
             t_mask_shrink = mask_shrink(t_mask)
-            t1 = bmp.getrowsize(int(xmin/ds_factor))
+            t1 = bmp.getrowsize(int(xmin/ds_factor))  # !!
             t2 = int(ymin/ds_factor)
             image_size = slide.level_dimensions[best_ds_level]
             wh1 = bmp.getrowsize(int(image_size[0]))

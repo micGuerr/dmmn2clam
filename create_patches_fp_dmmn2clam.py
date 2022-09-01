@@ -61,7 +61,7 @@ def seg_and_patch(source, dmmn_seg, save_dir, patch_save_dir, mask_save_dir, sti
 
 	# store the DMMN segmentations
 	slide_segs = sorted(os.listdir(dmmn_seg))
-	slide_segs = [slide_seg for slide_seg in slide_segs if (os.path.splitext(slide_seg)[1] != '.png')]
+	slide_segs = [slide_seg for slide_seg in slide_segs if (os.path.splitext(slide_seg)[1] == '.mat')]
 
 	if process_list is None:
 		df = initialize_df(slides, slide_segs, seg_params, filter_params, vis_params, patch_params)
@@ -197,7 +197,7 @@ def seg_and_patch(source, dmmn_seg, save_dir, patch_save_dir, mask_save_dir, sti
 		if save_mask:
 			mask = WSI_object.visWSI(**current_vis_params)
 			mask_path = os.path.join(mask_save_dir, slide_id+'.jpg')
-			mask.save(mask_path)
+			mask.save(mask_path, quality=100)
 
 		patch_time_elapsed = -1 # Default time
 		if patch:

@@ -36,7 +36,7 @@ if __name__ == '__main__':
     if do_otsu:
         ### get coordinates of tissue patches in whole slide images using Otsu algorithm ###
         for image_path in slides:
-            slide = openslide.OpenSlide(os.path.join(source,image_path))
+            slide = openslide.OpenSlide(os.path.join(image_path))
             slide_id = os.path.splitext(os.path.basename(image_path))[0]
             grid, _ = extract_tissue.make_sample_grid(slide, 256,
                                                       zoom, 10, 10, False, prune=False, overlap=0)
@@ -46,7 +46,7 @@ if __name__ == '__main__':
         ### get coordinates of all patches in whole slide images ###
         stride = 256
         for image_path in slides:
-            slide = openslide.OpenSlide(os.path.join(source, image_path))
+            slide = openslide.OpenSlide(os.path.join(image_path))
             slide_id = os.path.splitext(os.path.basename(image_path))[0]
             slide_zoom = int(slide.properties[openslide.PROPERTY_NAME_OBJECTIVE_POWER])
             ds_factor = slide_zoom/zoom
