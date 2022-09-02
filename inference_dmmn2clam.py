@@ -99,7 +99,7 @@ def test():
 
     # loop over all the lines of the coordinates file
     with torch.no_grad():
-        for ii in  tqdm(range(0, len(test_file_patches))):
+        for ii in tqdm(range(0, 1000)):  # tqdm(range(0, len(test_file_patches))):
 
             # take current line slide ID, X and Y coord
             test_file_patches_split = test_file_patches[ii].split(",")
@@ -384,6 +384,19 @@ def saveSeg(outfile, slide, filename, filename_img, filename_orig, slide_level=0
     fig_slide = slide.read_region((0, 0), imshow_level, slide.level_dimensions[imshow_level]).convert('RGB')
     fig_slide.save(filename_orig)
 
+    # 3 save overlay
+    fig_overlay = plt.figure()
+    fig_overlay1 = np.array(
+        slide.read_region((0, 0), imshow_level, slide.level_dimensions[imshow_level]).convert('L')) / 255.0
+    overlay2 = outfile_bin_ds
+    plt.imshow(fig_overlay1, cmap='gray')
+    plt.imshow(overlay2, cmap='Dark2', alpha=0.5)
+    plt.clim(0,7)
+    plt.colorbar()
+    plt.xticks([])
+    plt.yticks([])
+    #plt.show()
+    fig_overlay.savefig(filename_img.split(sep='.png')[0] + '_overlay.png', dpi=800)
 
 def color_change(t_mask):
     t_mask[t_mask == 0] = 4
