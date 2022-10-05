@@ -8,9 +8,12 @@ import scipy.io
 from bs4 import BeautifulSoup
 import openslide
 import matplotlib as mpl
+#mpl.use('Agg')
 mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+
+import shutil
 
 '''
 The aim of this piece of script is to extract the coordinates of rectangular regions of interest (boxes) obtained from 
@@ -25,6 +28,7 @@ parser = argparse.ArgumentParser(description="Params")
 parser.add_argument( "--source_file", nargs="?", type=str, help='text file containing the paths to ndpi and Box files)')
 parser.add_argument( "--seg_file", nargs="?", type=str, help='path to file containing paths to the segmentation files')
 parser.add_argument( "--out_path", nargs="?", type=str, default='.', help=' folder where to store all the new figures')
+parser.add_argument( "--tmp", nargs="?", type=str, default='.', help='Temporary directory to store data')
 parser.add_argument( "--ds", nargs="?", type=int, default=64, help='Down sampling factor')
 
 if __name__ == '__main__':
@@ -39,11 +43,24 @@ if __name__ == '__main__':
 	with open(seg_file, 'r') as f_seg:
 		path2segs = f_seg.read().splitlines()
 
+	tmp_dir = args.tmp
+
 	# loop over all the entries
 	for slide_path, seg_path in zip(path2slides, path2segs):
 
 		#
-		slide = openslide.OpenSlide(slide_path)
+		print(slide_path)
+
+		# create a temporary directory to store data
+		if not os.path.isdir(tmp_dir):
+			os.mkdir(tmp_dir)
+
+		# temporary copy data locally
+		slide_id = os.path.split(slide_path)
+		tmp_slide = os.path.join(tmp_dir, slide_id[1])
+		shutil.copyfile(slide_path, tmp_slide)
+
+		slide = openslide.OpenSlide(tmp_slide)
 		box = slide_path + '.ndpa'
 		seg = scipy.io.loadmat(seg_path)
 		seg = seg['seg']
@@ -66,7 +83,7 @@ if __name__ == '__main__':
 
 		# Finding all instances of tag
 		b_unique = bs_data.find_all('ndpviewstate')
-		print(b_unique)
+		#print(b_unique)
 
 		# Kow many ROI BOC are there?
 		n_box = len(b_unique)
@@ -101,7 +118,7 @@ if __name__ == '__main__':
 		for child in b_unique:
 
 			# parse the field corresponding to the points
-			print(child)
+			#print(child)
 			points = child.find_all('point')
 
 			# following coordinates are in Sys Of Ref centered in the offSet point (expressed in nm)!!!
@@ -132,3 +149,4 @@ if __name__ == '__main__':
 
 		fig_overlay.savefig(os.path.join(args.out_path, slide_id) + '_overlay.png', dpi=800)
 		plt.close()
+		os.remove(tmp_slide)
